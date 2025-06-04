@@ -5,14 +5,24 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 TOKEN = "8088210734:AAFYLqqjYNhSDUdTWHQ2v11rmBsUVZ-sTws"
 API_URL = "https://restcountries.com/v3.1/name/"
 
+# /start command
 async def start(update: Update, context: CallbackContext):
     await update.message.reply_text(
         "🌍 Welcome to the Country Info Bot!\n"
         "Send me a country name to get information and its flag.\n\n"
-        "Example: France or france",
-        parse_mode='Markdown'
+        "Example: France or france"
     )
 
+# /help command
+async def help_command(update: Update, context: CallbackContext):
+    await update.message.reply_text(
+        "ℹ️ Send any country name to get:\n"
+        "- Basic information\n"
+        "- Official flag image\n\n"
+        "Examples:\nGermany\nBrazil\nSouth Africa"
+    )
+
+# Handles country name text
 async def get_country_info(update: Update, context: CallbackContext):
     country_name = update.message.text.strip()
     if not country_name:
@@ -42,7 +52,7 @@ async def get_country_info(update: Update, context: CallbackContext):
 
     currencies = country.get('currencies', {})
     if currencies:
-        currency_info = [f"{info['name']} ({info['symbol']})" for info in currencies.values()]
+        currency_info = [f"{info.get('name', '')} ({info.get('symbol', '')})" for info in currencies.values()]
         currencies_str = ', '.join(currency_info)
     else:
         currencies_str = 'N/A'
@@ -60,25 +70,25 @@ async def get_country_info(update: Update, context: CallbackContext):
     )
 
     if flag_url:
-        await update.message.reply_photo(photo=flag_url, caption=message, parse_mode='Markdown')
+        await update.message.reply_photo(
+            photo=flag_url,
+            caption=message,
+            parse_mode='Markdown'
+        )
     else:
         await update.message.reply_text(message, parse_mode='Markdown')
 
-async def help_command(update: Update, context: CallbackContext):
-    await update.message.reply_text(
-        "ℹ️ Send any country name to get:\n"
-        "- Basic information\n"
-        "- Official flag image\n\n"
-        "Examples:\nGermany\nbrazil\nsouth africa"
-    )
-
+# Main runner
 def main():
     application = Application.builder().token(TOKEN).build()
+    
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, get_country_info))
+    
+    print("🤖 Bot is running...")
     application.run_polling()
 
-# ✅ Corrected this line:
+# Entry point
 if __name__ == "__main__":
     main()
