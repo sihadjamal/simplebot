@@ -1,3 +1,2 @@
-pyTelegramBotAPI
-pycountry
-countryinfo
+python remove_webhook.py
+
