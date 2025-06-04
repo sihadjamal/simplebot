@@ -1,37 +1,45 @@
 import telebot
-import random
+import pycountry
+from countryinfo import CountryInfo
 
-TOKEN = "8088210734:AAFYLqqjYNhSDUdTWHQ2v11rmBsUVZ-sTws"  # Replace with your actual bot token
+TOKEN = "8088210734:AAFYLqqjYNhSDUdTWHQ2v11rmBsUVZ-sTws"  # Replace with your bot token
 bot = telebot.TeleBot(TOKEN)
 
-# List of motivational quotes
-quotes = [
-    "🌟 Believe in yourself and all that you are.",
-    "💪 The harder you work for something, the greater you’ll feel when you achieve it.",
-    "🚀 Don’t watch the clock; do what it does. Keep going.",
-    "🔥 Push yourself, because no one else is going to do it for you.",
-    "🎯 Success doesn’t just find you. You have to go out and get it."
-]
-
-# /start command handler
 @bot.message_handler(commands=['start'])
-def send_welcome(message):
-    print(f"Received /start from {message.from_user.username}")
-    bot.reply_to(message, "👋 Hello! I'm your bot running with polling.\nType /quote to get a motivational quote.")
+def start(message):
+    bot.reply_to(message, "🌍 Send me any country name and I’ll tell you about it!")
 
-# /quote command handler
-@bot.message_handler(commands=['quote'])
-def send_quote(message):
-    quote = random.choice(quotes)
-    print(f"Sent quote to {message.from_user.username}")
-    bot.reply_to(message, quote)
-
-# Echo handler
 @bot.message_handler(func=lambda message: True)
-def echo_all(message):
-    print(f"Received message: {message.text} from {message.from_user.username}")
-    bot.reply_to(message, message.text)
+def country_info(message):
+    country_name = message.text.strip()
+    try:
+        country = pycountry.countries.get(name=country_name) or \
+                  pycountry.countries.search_fuzzy(country_name)[0]
+
+        info = CountryInfo(country.name)
+        capital = info.capital()
+        population = info.info().get("population", "Unknown")
+        currencies = ", ".join(info.currencies())
+        languages = ", ".join(info.languages())
+        region = info.region()
+        subregion = info.subregion()
+
+        # Country flag emoji via Unicode Regional Indicator Symbols
+        flag = ''.join([chr(127397 + ord(c)) for c in country.alpha_2.upper()])
+
+        reply = (
+            f"{flag} *{country.name}*\n"
+            f"🌆 Capital: {capital}\n"
+            f"🌍 Region: {region} ({subregion})\n"
+            f"🗣️ Languages: {languages}\n"
+            f"💰 Currencies: {currencies}\n"
+            f"👥 Population: {population}"
+        )
+
+        bot.reply_to(message, reply, parse_mode='Markdown')
+    except Exception as e:
+        bot.reply_to(message, "❌ I couldn't find that country. Please try a valid name.")
 
 if __name__ == "__main__":
-    print("🤖 Bot is running using polling...")
+    print("🌐 Country info bot is running...")
     bot.infinity_polling()
