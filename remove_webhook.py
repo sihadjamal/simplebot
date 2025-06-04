@@ -1,94 +1,81 @@
-import requests
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
+import telebot
+import pycountry
+from countryinfo import CountryInfo
 
-TOKEN = "8088210734:AAFYLqqjYNhSDUdTWHQ2v11rmBsUVZ-sTws"
-API_URL = "https://restcountries.com/v3.1/name/"
+TOKEN = "8088210734:AAFYLqqjYNhSDUdTWHQ2v11rmBsUVZ-sTws"  # Replace with your actual bot token
+bot = telebot.TeleBot(TOKEN)
 
-# /start command
-async def start(update: Update, context: CallbackContext):
-    await update.message.reply_text(
-        "🌍 Welcome to the Country Info Bot!\n"
-        "Send me a country name to get information and its flag.\n\n"
-        "Example: France or france"
+def get_flag_emoji(country_code):
+    # Convert country alpha_2 code to regional indicator symbols (flag emoji)
+    return ''.join(chr(127397 + ord(c)) for c in country_code.upper())
+
+def format_population(pop):
+    try:
+        return f"{int(pop):,}"
+    except:
+        return "Unknown"
+
+@bot.message_handler(commands=['start'])
+def start(message):
+    user = message.from_user.username or message.from_user.first_name or "there"
+    bot.reply_to(message, f"🌍 Hello @{user}! Send me any country name and I'll provide detailed info about it!")
+
+@bot.message_handler(commands=['help'])
+def help_command(message):
+    bot.reply_to(message,
+        "📝 *How to use this bot:*\n"
+        "Simply send me the name of any country, and I'll reply with its capital, population, languages, currencies, and region.\n\n"
+        "Commands:\n"
+        "/start - Welcome message\n"
+        "/help - This help message\n"
+        "/about - About this bot",
+        parse_mode='Markdown'
     )
 
-# /help command
-async def help_command(update: Update, context: CallbackContext):
-    await update.message.reply_text(
-        "ℹ️ Send any country name to get:\n"
-        "- Basic information\n"
-        "- Official flag image\n\n"
-        "Examples:\nGermany\nBrazil\nSouth Africa"
+@bot.message_handler(commands=['about'])
+def about(message):
+    bot.reply_to(message,
+        "🤖 *Country Info Bot*\n"
+        "Built with Python, pycountry, and CountryInfo.\n"
+        "Get quick facts and the flag emoji for any country.\n\n"
+        "Created by YourName\n"
+        "Source: https://github.com/yourgithubrepo",
+        parse_mode='Markdown'
     )
 
-# Handles country name text
-async def get_country_info(update: Update, context: CallbackContext):
-    country_name = update.message.text.strip()
-    if not country_name:
-        await update.message.reply_text("Please enter a country name.")
-        return
+@bot.message_handler(func=lambda message: True)
+def country_info(message):
+    country_name = message.text.strip()
+    try:
+        # Try exact match first
+        country = pycountry.countries.get(name=country_name)
+        # If not found, do fuzzy search for partial or similar names
+        if not country:
+            country = pycountry.countries.search_fuzzy(country_name)[0]
 
-    response = requests.get(f"{API_URL}{country_name}")
-    
-    if response.status_code == 404:
-        await update.message.reply_text("❌ Country not found. Please check the spelling and try again.")
-        return
-    elif response.status_code != 200:
-        await update.message.reply_text("⚠️ Service unavailable. Please try again later.")
-        return
+        info = CountryInfo(country.name)
+        capital = info.capital() or "Unknown"
+        population = format_population(info.info().get("population", "Unknown"))
+        currencies = ", ".join(info.currencies()) if info.currencies() else "Unknown"
+        languages = ", ".join(info.languages()) if info.languages() else "Unknown"
+        region = info.region() or "Unknown"
+        subregion = info.subregion() or "Unknown"
+        flag = get_flag_emoji(country.alpha_2)
 
-    data = response.json()
-    country = data[0]
-
-    name = country.get('name', {}).get('common', 'N/A')
-    official_name = country.get('name', {}).get('official', 'N/A')
-    capital = ', '.join(country.get('capital', ['N/A']))
-    region = country.get('region', 'N/A')
-    subregion = country.get('subregion', 'N/A')
-    population = f"{country.get('population', 0):,}"
-    area = f"{country.get('area', 0):,} km²" if country.get('area') else 'N/A'
-    languages = ', '.join(country.get('languages', {}).values()) if country.get('languages') else 'N/A'
-
-    currencies = country.get('currencies', {})
-    if currencies:
-        currency_info = [f"{info.get('name', '')} ({info.get('symbol', '')})" for info in currencies.values()]
-        currencies_str = ', '.join(currency_info)
-    else:
-        currencies_str = 'N/A'
-
-    flag_url = country.get('flags', {}).get('png', '')
-
-    message = (
-        f"🇺🇳 *{name}* ({official_name})\n\n"
-        f"*Capital:* {capital}\n"
-        f"*Region:* {region} ({subregion})\n"
-        f"*Population:* {population}\n"
-        f"*Area:* {area}\n"
-        f"*Languages:* {languages}\n"
-        f"*Currencies:* {currencies_str}"
-    )
-
-    if flag_url:
-        await update.message.reply_photo(
-            photo=flag_url,
-            caption=message,
-            parse_mode='Markdown'
+        reply = (
+            f"{flag} *{country.name}*\n"
+            f"🌆 Capital: {capital}\n"
+            f"🌍 Region: {region} ({subregion})\n"
+            f"🗣️ Languages: {languages}\n"
+            f"💰 Currencies: {currencies}\n"
+            f"👥 Population: {population}"
         )
-    else:
-        await update.message.reply_text(message, parse_mode='Markdown')
 
-# Main runner
-def main():
-    application = Application.builder().token(TOKEN).build()
-    
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, get_country_info))
-    
-    print("🤖 Bot is running...")
-    application.run_polling()
+        bot.reply_to(message, reply, parse_mode='Markdown')
 
-# Entry point
+    except Exception as e:
+        bot.reply_to(message, "❌ I couldn't find that country. Please check the spelling and try again.")
+
 if __name__ == "__main__":
-    main()
+    print("🌐 Country Info Bot is running...")
+    bot.infinity_polling()
