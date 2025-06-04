@@ -1,6 +1,6 @@
 import requests
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext, CallbackQueryHandler
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 
 TOKEN = "8088210734:AAFYLqqjYNhSDUdTWHQ2v11rmBsUVZ-sTws"
 API_URL = "https://restcountries.com/v3.1/name/"
@@ -29,10 +29,8 @@ async def get_country_info(update: Update, context: CallbackContext):
         return
 
     data = response.json()
-    # Get the first country from possible multiple results
     country = data[0]
 
-    # Extract country information
     name = country.get('name', {}).get('common', 'N/A')
     official_name = country.get('name', {}).get('official', 'N/A')
     capital = ', '.join(country.get('capital', ['N/A']))
@@ -41,21 +39,16 @@ async def get_country_info(update: Update, context: CallbackContext):
     population = f"{country.get('population', 0):,}"
     area = f"{country.get('area', 0):,} km²" if country.get('area') else 'N/A'
     languages = ', '.join(country.get('languages', {}).values()) if country.get('languages') else 'N/A'
-    
-    # Format currencies
+
     currencies = country.get('currencies', {})
     if currencies:
-        currency_info = []
-        for code, info in currencies.items():
-            currency_info.append(f"{info['name']} ({info['symbol']})")
+        currency_info = [f"{info['name']} ({info['symbol']})" for info in currencies.values()]
         currencies_str = ', '.join(currency_info)
     else:
         currencies_str = 'N/A'
-    
-    # Get flag URL
+
     flag_url = country.get('flags', {}).get('png', '')
-    
-    # Prepare response message
+
     message = (
         f"🇺🇳 *{name}* ({official_name})\n\n"
         f"*Capital:* {capital}\n"
@@ -66,13 +59,8 @@ async def get_country_info(update: Update, context: CallbackContext):
         f"*Currencies:* {currencies_str}"
     )
 
-    # Send message with flag photo
     if flag_url:
-        await update.message.reply_photo(
-            photo=flag_url,
-            caption=message,
-            parse_mode='Markdown'
-        )
+        await update.message.reply_photo(photo=flag_url, caption=message, parse_mode='Markdown')
     else:
         await update.message.reply_text(message, parse_mode='Markdown')
 
@@ -86,14 +74,11 @@ async def help_command(update: Update, context: CallbackContext):
 
 def main():
     application = Application.builder().token(TOKEN).build()
-    
-    # Add handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, get_country_info))
-    
-    # Start the Bot
     application.run_polling()
 
-if name == 'main':
+# ✅ Corrected this line:
+if __name__ == "__main__":
     main()
